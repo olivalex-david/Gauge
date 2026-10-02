@@ -1,30 +1,86 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
+import 'package:gauge/data/memory/in_memory_workout_repository.dart';
 import 'package:gauge/main.dart';
+import 'package:gauge/models/workout.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  // The in-memory repository means tests need no SQLite plugin — the payoff
+  // of depending on the WorkoutRepository interface.
+  testWidgets('logging a workout shows it in the list', (tester) async {
+    await tester.pumpWidget(GaugeApp(repository: InMemoryWorkoutRepository()));
+    // pumpAndSettle keeps rendering frames until animations and pending
+    // futures (like the initial load()) have finished.
+    await tester.pumpAndSettle();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Open the sidebar and go to Workouts.
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      // "Workouts" also appears on a Home stat card, so look only inside the
+      // drawer.
+      find.descendant(
+        of: find.byType(NavigationDrawer),
+        matching: find.text('Workouts'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('No workouts yet. Tap + to log one.'), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    // Fill in and save the form.
+    await tester.tap(find.text('Log workout'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Name'),
+      'Leg day',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Duration (minutes)'),
+      '45',
+    );
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Leg day'), findsOneWidget);
+  });
+
+  testWidgets('form rejects an empty name', (tester) async {
+    await tester.pumpWidget(GaugeApp(repository: InMemoryWorkoutRepository()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      // "Workouts" also appears on a Home stat card, so look only inside the
+      // drawer.
+      find.descendant(
+        of: find.byType(NavigationDrawer),
+        matching: find.text('Workouts'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Log workout'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Give the workout a name'), findsOneWidget);
+  });
+
+  testWidgets('home dashboard reflects existing workouts', (tester) async {
+    final repo = InMemoryWorkoutRepository([
+      Workout(
+        name: 'Pull day',
+        date: DateTime(2026, 9, 30),
+        durationMinutes: 50,
+      ),
+      Workout(name: 'Run', date: DateTime(2026, 10, 1), durationMinutes: 30),
+    ]);
+    await tester.pumpWidget(GaugeApp(repository: repo));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2'), findsOneWidget); // workout count
+    expect(find.text('80'), findsOneWidget); // total minutes
+    expect(find.textContaining('Run'), findsOneWidget); // latest by date
   });
 }
