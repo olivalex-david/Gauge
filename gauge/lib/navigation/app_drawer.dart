@@ -22,6 +22,12 @@ const _destinations = [
     Icons.fitness_center,
   ),
   _Destination('Goals', Routes.goals, Icons.flag_outlined, Icons.flag),
+  _Destination(
+    'Settings',
+    Routes.settings,
+    Icons.settings_outlined,
+    Icons.settings,
+  ),
 ];
 
 /// The sidebar shared by all top-level screens.

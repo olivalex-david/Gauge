@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'controllers/settings_controller.dart';
 import 'controllers/workout_controller.dart';
+import 'data/prefs/prefs_settings_repository.dart';
+import 'data/settings_repository.dart';
 import 'data/sqlite/app_database.dart';
 import 'data/sqlite/sqlite_workout_repository.dart';
 import 'data/workout_repository.dart';
@@ -24,35 +27,72 @@ Future<void> main() async {
   //   To try the app without a database: `InMemoryWorkoutRepository()`.
   final WorkoutRepository repository = SqliteWorkoutRepository(db);
 
-  runApp(GaugeApp(repository: repository));
+  // Read the saved theme *before* the first frame, so the app opens in the
+  // right theme instead of flashing the default one first.
+  final SettingsRepository settingsRepository = PrefsSettingsRepository();
+  final themeMode = await settingsRepository.loadThemeMode();
+
+  runApp(
+    GaugeApp(
+      repository: repository,
+      settingsRepository: settingsRepository,
+      initialThemeMode: themeMode,
+    ),
+  );
 }
 
-/// The root widget. Taking the repository as a parameter (instead of creating
-/// it inside) is what lets tests pass in an in-memory version.
+/// The root widget. Taking the repositories as parameters (instead of
+/// creating them inside) is what lets tests pass in in-memory versions.
 class GaugeApp extends StatelessWidget {
-  const GaugeApp({super.key, required this.repository});
+  const GaugeApp({
+    super.key,
+    required this.repository,
+    required this.settingsRepository,
+    this.initialThemeMode = ThemeMode.system,
+  });
 
   final WorkoutRepository repository;
+  final SettingsRepository settingsRepository;
+  final ThemeMode initialThemeMode;
 
   @override
   Widget build(BuildContext context) {
-    // Placing the provider *above* MaterialApp makes the controller reachable
-    // from every screen, including ones pushed with Navigator later. If it
-    // were inside a single screen, other routes couldn't find it and you'd
-    // get a ProviderNotFoundException.
-    return ChangeNotifierProvider(
-      // `create` runs once, lazily. The `..` cascade calls load() on the new
-      // controller and still returns the controller itself. Provider also
-      // calls dispose() on it automatically when it's removed.
-      create: (_) => WorkoutController(repository)..load(),
-      child: MaterialApp(
-        title: 'Gauge',
-        // Both themes are given; iOS's light/dark setting picks one
-        // automatically (themeMode defaults to ThemeMode.system).
-        theme: AppTheme.light,
-        darkTheme: AppTheme.dark,
-        initialRoute: Routes.home,
-        routes: Routes.table,
+    // Placing the providers *above* MaterialApp makes the controllers
+    // reachable from every screen, including ones pushed with Navigator later.
+    // If one were inside a single screen, other routes couldn't find it and
+    // you'd get a ProviderNotFoundException.
+    //
+    // MultiProvider is just a tidier way to nest several providers.
+    return MultiProvider(
+      providers: [
+        // `create` runs once, lazily. The `..` cascade calls load() on the
+        // new controller and still returns the controller itself. Provider
+        // also calls dispose() on it automatically when it's removed.
+        ChangeNotifierProvider(
+          create: (_) => WorkoutController(repository)..load(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => SettingsController(
+            settingsRepository,
+            initialThemeMode: initialThemeMode,
+          ),
+        ),
+      ],
+      // Tricky: we can't call context.watch<SettingsController>() in this
+      // build method. This `context` belongs to GaugeApp, which sits *above*
+      // the MultiProvider, and lookups only search upward. Consumer is a
+      // widget placed *below* the provider; its builder gets a context that
+      // can find it, and it rebuilds MaterialApp when the theme changes.
+      child: Consumer<SettingsController>(
+        builder: (context, settings, _) => MaterialApp(
+          title: 'Gauge',
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          // system = follow the iPhone's setting; light/dark = force one.
+          themeMode: settings.themeMode,
+          initialRoute: Routes.home,
+          routes: Routes.table,
+        ),
       ),
     );
   }
