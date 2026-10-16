@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'controllers/plan_controller.dart';
 import 'controllers/settings_controller.dart';
 import 'controllers/workout_controller.dart';
+import 'data/plan_repository.dart';
 import 'data/prefs/prefs_settings_repository.dart';
 import 'data/settings_repository.dart';
 import 'data/sqlite/app_database.dart';
+import 'data/sqlite/sqlite_plan_repository.dart';
 import 'data/sqlite/sqlite_workout_repository.dart';
 import 'data/workout_repository.dart';
 import 'navigation/routes.dart';
@@ -26,6 +29,7 @@ Future<void> main() async {
   //   later: `final repository = ApiWorkoutRepository(httpClient);`
   //   To try the app without a database: `InMemoryWorkoutRepository()`.
   final WorkoutRepository repository = SqliteWorkoutRepository(db);
+  final PlanRepository planRepository = SqlitePlanRepository(db);
 
   // Read the saved theme *before* the first frame, so the app opens in the
   // right theme instead of flashing the default one first.
@@ -35,6 +39,7 @@ Future<void> main() async {
   runApp(
     GaugeApp(
       repository: repository,
+      planRepository: planRepository,
       settingsRepository: settingsRepository,
       initialThemeMode: themeMode,
     ),
@@ -47,11 +52,13 @@ class GaugeApp extends StatelessWidget {
   const GaugeApp({
     super.key,
     required this.repository,
+    required this.planRepository,
     required this.settingsRepository,
     this.initialThemeMode = ThemeMode.system,
   });
 
   final WorkoutRepository repository;
+  final PlanRepository planRepository;
   final SettingsRepository settingsRepository;
   final ThemeMode initialThemeMode;
 
@@ -70,6 +77,9 @@ class GaugeApp extends StatelessWidget {
         // also calls dispose() on it automatically when it's removed.
         ChangeNotifierProvider(
           create: (_) => WorkoutController(repository)..load(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => PlanController(planRepository)..load(),
         ),
         ChangeNotifierProvider(
           create: (_) => SettingsController(

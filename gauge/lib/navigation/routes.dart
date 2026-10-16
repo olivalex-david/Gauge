@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../screens/home_screen.dart';
 import '../screens/placeholder_screen.dart';
+import '../screens/plans_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/workouts_screen.dart';
 
@@ -12,6 +13,7 @@ import '../screens/workouts_screen.dart';
 abstract final class Routes {
   static const home = '/';
   static const workouts = '/workouts';
+  static const plans = '/plans';
   static const goals = '/goals';
   static const settings = '/settings';
 
@@ -20,6 +22,7 @@ abstract final class Routes {
   static final Map<String, WidgetBuilder> table = {
     home: (_) => const HomeScreen(),
     workouts: (_) => const WorkoutsScreen(),
+    plans: (_) => const PlansScreen(),
     goals: (_) => const PlaceholderScreen(
       title: 'Goals',
       route: goals,

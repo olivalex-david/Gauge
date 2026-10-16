@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gauge/data/memory/in_memory_plan_repository.dart';
 import 'package:gauge/data/memory/in_memory_settings_repository.dart';
 import 'package:gauge/data/memory/in_memory_workout_repository.dart';
 import 'package:gauge/main.dart';
@@ -12,6 +13,7 @@ void main() {
     await tester.pumpWidget(
       GaugeApp(
         repository: InMemoryWorkoutRepository(),
+        planRepository: InMemoryPlanRepository(),
         settingsRepository: InMemorySettingsRepository(),
       ),
     );
@@ -54,6 +56,7 @@ void main() {
     await tester.pumpWidget(
       GaugeApp(
         repository: InMemoryWorkoutRepository(),
+        planRepository: InMemoryPlanRepository(),
         settingsRepository: InMemorySettingsRepository(),
       ),
     );
@@ -90,6 +93,7 @@ void main() {
     await tester.pumpWidget(
       GaugeApp(
         repository: repo,
+        planRepository: InMemoryPlanRepository(),
         settingsRepository: InMemorySettingsRepository(),
       ),
     );
@@ -107,6 +111,7 @@ void main() {
     await tester.pumpWidget(
       GaugeApp(
         repository: InMemoryWorkoutRepository(),
+        planRepository: InMemoryPlanRepository(),
         settingsRepository: settings,
       ),
     );
@@ -123,5 +128,38 @@ void main() {
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.themeMode, ThemeMode.dark);
     expect(settings.themeMode, ThemeMode.dark); // It was saved, too.
+  });
+
+  testWidgets('creating a plan shows it in the list', (tester) async {
+    await tester.pumpWidget(
+      GaugeApp(
+        repository: InMemoryWorkoutRepository(),
+        planRepository: InMemoryPlanRepository(),
+        settingsRepository: InMemorySettingsRepository(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Open navigation menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationDrawer),
+        matching: find.text('Plans'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('No plans yet. Tap + to add one.'), findsOneWidget);
+
+    await tester.tap(find.text('New plan'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Name'),
+      '5x5 Strength',
+    );
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('5x5 Strength'), findsOneWidget);
   });
 }

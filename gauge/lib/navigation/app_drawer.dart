@@ -21,6 +21,7 @@ const _destinations = [
     Icons.fitness_center_outlined,
     Icons.fitness_center,
   ),
+  _Destination('Plans', Routes.plans, Icons.list_alt_outlined, Icons.list_alt),
   _Destination('Goals', Routes.goals, Icons.flag_outlined, Icons.flag),
   _Destination(
     'Settings',

@@ -3,8 +3,8 @@ import 'package:sqflite/sqflite.dart';
 
 /// Opens the SQLite database file and creates/migrates the schema.
 ///
-/// One `Database` instance is shared by all SQLite repositories (workouts now,
-/// plans/goals later), so each new feature just adds a table here.
+/// One `Database` instance is shared by all SQLite repositories (workouts, plans,
+/// goals later), so each new feature just adds a table here.
 class AppDatabase {
   static const _fileName = 'gauge.db';
 
@@ -13,7 +13,15 @@ class AppDatabase {
   /// `onCreate` only runs on a fresh install, so existing users only get new
   /// tables/columns through `onUpgrade`. Forgetting this is a classic bug —
   /// the app works on your freshly installed simulator but crashes for users.
-  static const _version = 1;
+  static const _version = 2;
+
+  // Shared by _onCreate and _onUpgrade so both create the exact same table.
+  static const _createPlansTable = '''
+    CREATE TABLE plans (
+      id   INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT    NOT NULL
+    )
+  ''';
 
   static Future<Database> open() async {
     // getDatabasesPath() returns the platform-specific folder where apps are
@@ -37,6 +45,7 @@ class AppDatabase {
         notes            TEXT    NOT NULL DEFAULT ''
       )
     ''');
+    await db.execute(_createPlansTable);
   }
 
   static Future<void> _onUpgrade(
@@ -44,12 +53,10 @@ class AppDatabase {
     int oldVersion,
     int newVersion,
   ) async {
-    // Example for when you add the next feature (set _version = 2):
-    //
-    // if (oldVersion < 2) {
-    //   await db.execute('CREATE TABLE goals (...)');
-    // }
-    //
+    if (oldVersion < 2) {
+      await db.execute(_createPlansTable);
+    }
+
     // Using `if (oldVersion < N)` blocks (not `else if`) lets a user who skipped
     // several app updates run every missing migration in order.
   }
