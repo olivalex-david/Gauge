@@ -1,121 +1,108 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-void main() {
-  runApp(const MyApp());
+import 'controllers/plan_controller.dart';
+import 'controllers/settings_controller.dart';
+import 'controllers/workout_controller.dart';
+import 'data/plan_repository.dart';
+import 'data/prefs/prefs_settings_repository.dart';
+import 'data/settings_repository.dart';
+import 'data/sqlite/app_database.dart';
+import 'data/sqlite/sqlite_plan_repository.dart';
+import 'data/sqlite/sqlite_workout_repository.dart';
+import 'data/workout_repository.dart';
+import 'navigation/routes.dart';
+import 'theme/app_theme.dart';
+
+// `main` can be async so we can open the database before showing the app.
+Future<void> main() async {
+  // Plugins like sqflite talk to native iOS code through "platform channels",
+  // which only exist once Flutter's engine binding is set up. runApp() would
+  // do that for us, but we need the database *before* runApp, so we
+  // initialize the binding manually first. Skip this and you get a
+  // "Binding has not yet been initialized" error.
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final db = await AppDatabase.open();
+
+  // ⬇ The single place that decides where data lives. To use a REST API
+  //   later: `final repository = ApiWorkoutRepository(httpClient);`
+  //   To try the app without a database: `InMemoryWorkoutRepository()`.
+  final WorkoutRepository repository = SqliteWorkoutRepository(db);
+  final PlanRepository planRepository = SqlitePlanRepository(db);
+
+  // Read the saved theme *before* the first frame, so the app opens in the
+  // right theme instead of flashing the default one first.
+  final SettingsRepository settingsRepository = PrefsSettingsRepository();
+  final themeMode = await settingsRepository.loadThemeMode();
+
+  runApp(
+    GaugeApp(
+      repository: repository,
+      planRepository: planRepository,
+      settingsRepository: settingsRepository,
+      initialThemeMode: themeMode,
+    ),
+  );
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+/// The root widget. Taking the repositories as parameters (instead of
+/// creating them inside) is what lets tests pass in in-memory versions.
+class GaugeApp extends StatelessWidget {
+  const GaugeApp({
+    super.key,
+    required this.repository,
+    required this.planRepository,
+    required this.settingsRepository,
+    this.initialThemeMode = ThemeMode.system,
+  });
 
-  // This widget is the root of your application.
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
+  final WorkoutRepository repository;
+  final PlanRepository planRepository;
+  final SettingsRepository settingsRepository;
+  final ThemeMode initialThemeMode;
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
+    // Placing the providers *above* MaterialApp makes the controllers
+    // reachable from every screen, including ones pushed with Navigator later.
+    // If one were inside a single screen, other routes couldn't find it and
+    // you'd get a ProviderNotFoundException.
     //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times X:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+    // MultiProvider is just a tidier way to nest several providers.
+    return MultiProvider(
+      providers: [
+        // `create` runs once, lazily. The `..` cascade calls load() on the
+        // new controller and still returns the controller itself. Provider
+        // also calls dispose() on it automatically when it's removed.
+        ChangeNotifierProvider(
+          create: (_) => WorkoutController(repository)..load(),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+        ChangeNotifierProvider(
+          create: (_) => PlanController(planRepository)..load(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => SettingsController(
+            settingsRepository,
+            initialThemeMode: initialThemeMode,
+          ),
+        ),
+      ],
+      // Tricky: we can't call context.watch<SettingsController>() in this
+      // build method. This `context` belongs to GaugeApp, which sits *above*
+      // the MultiProvider, and lookups only search upward. Consumer is a
+      // widget placed *below* the provider; its builder gets a context that
+      // can find it, and it rebuilds MaterialApp when the theme changes.
+      child: Consumer<SettingsController>(
+        builder: (context, settings, _) => MaterialApp(
+          title: 'Gauge',
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          // system = follow the iPhone's setting; light/dark = force one.
+          themeMode: settings.themeMode,
+          initialRoute: Routes.home,
+          routes: Routes.table,
+        ),
       ),
     );
   }
